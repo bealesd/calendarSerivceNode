@@ -1,6 +1,7 @@
 const express = require('express')
 
 const Config = require('./config.js');
+const Secrets = require('./secrets.js');
 const CalendarRepo = require('./calendarRepo.js');
 const Helper = require('./helper.js');
 
@@ -10,12 +11,15 @@ const port = process.env.PORT || 8080;
 class Server {
     constructor() {
         const config = new Config();
-        const storageAccount = config.storageAccount;
-        const storageKey = config.storageKey;
-        const storageTable = config.storageTable;
+        this.calendarFields = config.calendarFields;
+        this.helper = new Helper(config.calendarFields);
+
+        const secrets = new Secrets();
+        const storageAccount = secrets.storageAccount;
+        const storageKey = secrets.storageKey;
+        const storageTable = secrets.storageTable;
 
         this.calendarRepo = new CalendarRepo(storageAccount, storageKey, storageTable);
-        this.helper = new Helper();
     }
 
     main() {
@@ -29,76 +33,119 @@ class Server {
         });
 
         app.get('/events', async (req, res) => {
-            const params = req.query;
-            const month = params[this.helper.fields.month.azure];
-            const year = params[this.helper.fields.year.azure];
-            const records = await this.calendarRepo.getRecordAsync(year, month);
+            try {
+                const params = req.query;
 
-            res.json(records);
+                const kwargs = {};
+                kwargs[this.helper.calendarFields.month.rest] = params[this.helper.calendarFields.month.rest];
+                kwargs[this.helper.calendarFields.year.rest] = params[this.helper.calendarFields.year.rest];
 
+                const validatedArgs = this.helper.validateArgs(kwargs);
+                const validatedYear = validatedArgs[this.helper.calendarFields.year.rest];
+                const validatedMonth = validatedArgs[this.helper.calendarFields.month.rest];
+
+                const records = await this.calendarRepo.getRecordAsync(validatedYear, validatedMonth);
+
+                res.json(records);
+            } catch (error) {
+                res.status(400).send(error.message);
+            }
         })
 
         app.post('/events', async (req, res) => {
-            let requestBody = req.body;
-            let kwargs = {
-                title: requestBody[this.helper.fields.title.rest],
-                year: requestBody[this.helper.fields.year.rest],
-                month: requestBody[this.helper.fields.month.rest],
-                day: requestBody[this.helper.fields.day.rest],
-                hour: requestBody[this.helper.fields.hour.rest],
-                minute: requestBody[this.helper.fields.minute.rest]
-            };
-            const guid = this.helper.uuidv4();
+            try {
+                let requestBody = req.body;
 
-            var entity = {
-                PartitionKey: guid,
-                RowKey: guid,
-                title: kwargs.title,
-                year: kwargs.year,
-                month: kwargs.month,
-                day: kwargs.day,
-                hour: kwargs.hour,
-                minute: kwargs.minute
-            };
+                const kwargs = {};
+                kwargs[this.helper.calendarFields.title.rest] = requestBody[this.helper.calendarFields.title.rest];
+                kwargs[this.helper.calendarFields.year.rest] = requestBody[this.helper.calendarFields.year.rest];
+                kwargs[this.helper.calendarFields.month.rest] = requestBody[this.helper.calendarFields.month.rest];
+                kwargs[this.helper.calendarFields.day.rest] = requestBody[this.helper.calendarFields.day.rest];
+                kwargs[this.helper.calendarFields.hour.rest] = requestBody[this.helper.calendarFields.hour.rest];
+                kwargs[this.helper.calendarFields.minute.rest] = requestBody[this.helper.calendarFields.minute.rest];
 
-            const id = await this.calendarRepo.insertOrReplaceRecordAsync(entity);
+                const validatedArgs = this.helper.validateArgs(kwargs);
+                const validatedTitle = validatedArgs[this.helper.calendarFields.title.rest];
+                const validatedYear = validatedArgs[this.helper.calendarFields.year.rest];
+                const validatedMonth = validatedArgs[this.helper.calendarFields.month.rest];
+                const validatedDay = validatedArgs[this.helper.calendarFields.day.rest];
+                const validatedHour = validatedArgs[this.helper.calendarFields.hour.rest];
+                const validatedMinute = validatedArgs[this.helper.calendarFields.minute.rest];
 
-            res.json({ 'guid': id });
+                const guid = this.helper.uuidv4();
+
+                var entity = {
+                    PartitionKey: guid,
+                    RowKey: guid,
+                    title: validatedTitle,
+                    year: validatedYear,
+                    month: validatedMonth,
+                    day: validatedDay,
+                    hour: validatedHour,
+                    minute: validatedMinute
+                };
+
+                const id = await this.calendarRepo.insertOrReplaceRecordAsync(entity);
+
+                res.json({ 'guid': id });
+            } catch (error) {
+                res.status(400).send(error.message);
+            }
+
         })
 
         app.put('/events/:guid', async (req, res) => {
-            const guid = req.params.guid;
+            try {
+                const guid = req.params.guid;
+                let requestBody = req.body;
 
-            let requestBody = req.body;
-            let kwargs = {
-                title: requestBody[this.helper.fields.title.rest],
-                year: requestBody[this.helper.fields.year.rest],
-                month: requestBody[this.helper.fields.month.rest],
-                day: requestBody[this.helper.fields.day.rest],
-                hour: requestBody[this.helper.fields.hour.rest],
-                minute: requestBody[this.helper.fields.minute.rest]
-            };
+                const kwargs = {};
+                kwargs[this.helper.calendarFields.guid.rest] = guid;
+                kwargs[this.helper.calendarFields.title.rest] = requestBody[this.helper.calendarFields.title.rest];
+                kwargs[this.helper.calendarFields.year.rest] = requestBody[this.helper.calendarFields.year.rest];
+                kwargs[this.helper.calendarFields.month.rest] = requestBody[this.helper.calendarFields.month.rest];
+                kwargs[this.helper.calendarFields.day.rest] = requestBody[this.helper.calendarFields.day.rest];
+                kwargs[this.helper.calendarFields.hour.rest] = requestBody[this.helper.calendarFields.hour.rest];
+                kwargs[this.helper.calendarFields.minute.rest] = requestBody[this.helper.calendarFields.minute.rest];
 
-            var entity = {
-                PartitionKey: guid,
-                RowKey: guid,
-                title: kwargs.title,
-                year: kwargs.year,
-                month: kwargs.month,
-                day: kwargs.day,
-                hour: kwargs.hour,
-                minute: kwargs.minute
-            };
+                const validatedArgs = this.helper.validateArgs(kwargs);
+                const validatedGuid = validatedArgs[this.helper.calendarFields.guid.rest];
+                const validatedTitle = validatedArgs[this.helper.calendarFields.title.rest];
+                const validatedYear = validatedArgs[this.helper.calendarFields.year.rest];
+                const validatedMonth = validatedArgs[this.helper.calendarFields.month.rest];
+                const validatedDay = validatedArgs[this.helper.calendarFields.day.rest];
+                const validatedHour = validatedArgs[this.helper.calendarFields.hour.rest];
+                const validatedMinute = validatedArgs[this.helper.calendarFields.minute.rest];
 
-            const id = await this.calendarRepo.insertOrReplaceRecordAsync(entity);
-            res.json({ 'Updated guid': id });
+                var entity = {
+                    PartitionKey: validatedGuid,
+                    RowKey: validatedGuid,
+                    title: validatedTitle,
+                    year: validatedYear,
+                    month: validatedMonth,
+                    day: validatedDay,
+                    hour: validatedHour,
+                    minute: validatedMinute
+                };
+
+                const id = await this.calendarRepo.insertOrReplaceRecordAsync(entity);
+                res.json({ 'Updated guid': id });
+            } catch (error) {
+                res.status(400).send(error.message);
+            }
+
         })
 
         app.delete('/events/:guid', async (req, res) => {
-            const guid = req.params.guid;
+            try {
+                const guid = req.params.guid;
 
-            const id = await this.calendarRepo.deleteCalendarRecordAsync(guid);
-            res.json({ 'Deleted guid': id });
+                const id = await this.calendarRepo.deleteCalendarRecordAsync(guid);
+                res.json({ 'Deleted guid': id });
+            } catch (error) {
+                res.status(400).send(error.message);
+            }
+
         })
 
         app.all('*', (req, res, next) => {

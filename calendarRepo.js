@@ -15,14 +15,14 @@ class CalendarRepo {
     async getRecordAsync(year, month) {
         const getAllEvents = this.helper.isNull(year) || this.helper.isNull(month);
 
-        let query = getAllEvents ? new storage.TableQuery() : new storage.TableQuery().where('year eq ?', `${year}`).and('month eq ?', `${month}`);
+        let query = getAllEvents ? new storage.TableQuery() : new storage.TableQuery().where('year eq ?', year).and('month eq ?', month);
 
         let promise = new Promise((res, rej) => {
             this.storageClient.queryEntities(this.storageTable, query, null, (error, result, response) => {
                 if (error) rej();
                 if (result.hasOwnProperty('entries') && result.entries.length > 0) {
-                    const parsedRecords = this.helper.parseRecords(result.entries);
-                    res(parsedRecords);
+                    const normalisedRecords = this.helper.normaliseAllRecordNames(result.entries);
+                    res(normalisedRecords);
                 }
                 else {
                     res([]);
